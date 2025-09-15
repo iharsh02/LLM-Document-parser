@@ -1,0 +1,67 @@
+import { type Request, type Response } from "express";
+import cloudinary from "../helper";
+import fs from "fs/promises";
+import { v4 as uuidv4 } from "uuid";
+import type { UploadApiResponse } from "cloudinary";
+import { connectRabbitMQ } from "../helper";
+
+export async function query(req: Request, res: Response) {
+  if (!req.file?.path) {
+    return res.status(400).json({ success: false, message: "file not exist" });
+  }
+
+  const filePath = req.file.path;
+
+  try {
+    const result: UploadApiResponse = await cloudinary.uploader.upload(
+      filePath,
+      { resource_type: "auto", folder: "claims", type: "upload" },
+    );
+
+    const jobId = uuidv4();
+    const payload = {
+      jobId,
+      files: [
+        {
+          url: result.secure_url,
+          public_id: result.public_id,
+          bytes: result.bytes,
+          format: result.format,
+        },
+      ],
+      nlpText:
+        typeof req.body?.nlpText === "string" ? req.body.nlpText : undefined,
+    };
+
+    const { connection, channel } = await connectRabbitMQ();
+    const queue = "parse-files";
+
+    await channel.assertQueue(queue, { durable: true });
+    channel.sendToQueue(queue, Buffer.from(JSON.stringify(payload)), {
+      persistent: true,
+      contentType: "application/json",
+      messageId: jobId,
+      type: "parse-files",
+    });
+
+    await channel.close();
+    await connection.close();
+
+    return res.status(200).json({
+      success: true,
+      message: "File uploaded and job queued",
+      jobId,
+    });
+  } catch (err: any) {
+    console.error("query() failed:", err?.message || err);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to upload and queue job",
+      error: err?.message ?? "unknown_error",
+    });
+  } finally {
+    try {
+      await fs.unlink(filePath);
+    } catch { }
+  }
+}
