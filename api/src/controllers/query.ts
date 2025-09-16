@@ -9,13 +9,13 @@ export async function query(req: Request, res: Response) {
   if (!req.file?.path) {
     return res.status(400).json({ success: false, message: "file not exist" });
   }
-
+  const { query } = req.body;
   const filePath = req.file.path;
 
   try {
     const result: UploadApiResponse = await cloudinary.uploader.upload(
       filePath,
-      { resource_type: "auto", folder: "claims", type: "upload" },
+      { resource_type: "auto", folder: "claims", type: "upload" }
     );
 
     const jobId = uuidv4();
@@ -29,12 +29,12 @@ export async function query(req: Request, res: Response) {
           format: result.format,
         },
       ],
-      nlpText:
-        typeof req.body?.nlpText === "string" ? req.body.nlpText : undefined,
+      query: query,
     };
 
     const { connection, channel } = await connectRabbitMQ();
     const queue = "parse-files";
+    const replyQueue = `results-${jobId}`;
 
     await channel.assertQueue(queue, { durable: true });
     channel.sendToQueue(queue, Buffer.from(JSON.stringify(payload)), {
@@ -42,6 +42,24 @@ export async function query(req: Request, res: Response) {
       contentType: "application/json",
       messageId: jobId,
       type: "parse-files",
+      replyTo: replyQueue,
+    });
+
+    await channel.assertQueue(replyQueue, { exclusive: true });
+    const resultMessage = await new Promise<string>((resolve, reject) => {
+      
+      channel.consume(
+        replyQueue,
+        (msg) => {
+          if (msg) {
+            const content = msg.content.toString();
+              resolve(content);
+          } else {
+            reject(new Error("No message received from results queue"));
+          }
+        },
+        { noAck: true }
+      );
     });
 
     await channel.close();
@@ -51,6 +69,7 @@ export async function query(req: Request, res: Response) {
       success: true,
       message: "File uploaded and job queued",
       jobId,
+      result: resultMessage,
     });
   } catch (err: any) {
     console.error("query() failed:", err?.message || err);
@@ -62,6 +81,6 @@ export async function query(req: Request, res: Response) {
   } finally {
     try {
       await fs.unlink(filePath);
-    } catch { }
+    } catch {}
   }
 }
