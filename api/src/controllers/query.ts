@@ -15,7 +15,7 @@ export async function query(req: Request, res: Response) {
   try {
     const result: UploadApiResponse = await cloudinary.uploader.upload(
       filePath,
-      { resource_type: "auto", folder: "claims", type: "upload" }
+      { resource_type: "auto", folder: "claims", type: "upload" },
     );
 
     const jobId = uuidv4();
@@ -47,18 +47,17 @@ export async function query(req: Request, res: Response) {
 
     await channel.assertQueue(replyQueue, { exclusive: true });
     const resultMessage = await new Promise<string>((resolve, reject) => {
-      
       channel.consume(
         replyQueue,
         (msg) => {
           if (msg) {
             const content = msg.content.toString();
-              resolve(content);
+            resolve(content);
           } else {
             reject(new Error("No message received from results queue"));
           }
         },
-        { noAck: true }
+        { noAck: true },
       );
     });
 
@@ -67,7 +66,7 @@ export async function query(req: Request, res: Response) {
 
     return res.status(200).json({
       success: true,
-      message: "File uploaded and job queued",
+      message: "success",
       jobId,
       result: resultMessage,
     });
@@ -75,12 +74,12 @@ export async function query(req: Request, res: Response) {
     console.error("query() failed:", err?.message || err);
     return res.status(500).json({
       success: false,
-      message: "Failed to upload and queue job",
+      message: "Failed",
       error: err?.message ?? "unknown_error",
     });
   } finally {
     try {
       await fs.unlink(filePath);
-    } catch {}
+    } catch { }
   }
 }

@@ -1,15 +1,31 @@
-# backend-js
+# Backend API
 
-To install dependencies:
+This is the backend API for the Hela project, built with TypeScript and Bun.
 
-```bash
-bun install
-```
+## Getting Started
 
-To run:
+### Prerequisites
 
-```bash
-bun run index.ts
-```
+- [Bun](https://bun.sh/) installed on your machine.
 
-This project was created using `bun init` in bun v1.2.4. [Bun](https://bun.sh) is a fast all-in-one JavaScript runtime.
+### Installation
+
+1. Install the dependencies:
+
+    ```bash
+        bun install
+    ```
+
+### Running the Application
+
+- **Development Mode:**
+
+    ```bash
+    bun dev
+    ```
+
+- **Production Mode:**
+
+    ```bash
+     bun start
+    ```
