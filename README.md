@@ -4,7 +4,11 @@ This project consists of two main components: a backend API and a core document 
 
 ## Components
 
-### API
+### Environment
+  
+  ```bash
+  cp .env.example .env
+  ```
 
 The backend API is built with TypeScript and Bun.
 

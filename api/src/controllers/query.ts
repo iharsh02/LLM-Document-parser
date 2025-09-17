@@ -4,12 +4,23 @@ import fs from "fs/promises";
 import { v4 as uuidv4 } from "uuid";
 import type { UploadApiResponse } from "cloudinary";
 import { connectRabbitMQ } from "../helper";
+import { QuerySchema } from "../schema/querySchema";
 
 export async function query(req: Request, res: Response) {
   if (!req.file?.path) {
     return res.status(400).json({ success: false, message: "file not exist" });
   }
-  const { query } = req.body;
+
+  const validation = QuerySchema.safeParse(req.body);
+
+  if (!validation.success) {
+    return res
+      .status(400)
+      .json({ success: false, message: validation.error });
+  }
+
+  const { query: validatedQuery } = validation.data;
+
   const filePath = req.file.path;
 
   try {
@@ -29,7 +40,7 @@ export async function query(req: Request, res: Response) {
           format: result.format,
         },
       ],
-      query: query,
+      query: validatedQuery,
     };
 
     const { connection, channel } = await connectRabbitMQ();
